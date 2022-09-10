@@ -5,7 +5,7 @@ import pytest
 import time
 from http.client import HTTPConnection
 
-root = pathlib.Path(__file__).parent.parent.absolute()
+root = pathlib.Path(__file__).parent.parent.absolute() / 'dist'
 
 
 @pytest.fixture(scope="module")
