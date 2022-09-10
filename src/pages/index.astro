@@ -1,0 +1,30 @@
+---
+import Layout from "../layouts/Layout.astro";
+import LoadingIndicator from "../components/LoadingIndicator.astro";
+import LoadCustomForm from '../components/LoadCustomForm.astro';
+
+
+---
+
+<Layout title="Datasette">
+
+	<!-- DOM -->
+	<LoadingIndicator />
+  <div id="output"></div>
+	<LoadCustomForm />
+
+	<!-- Scripts -->
+
+  <script>
+	import { initApp } from '../init-app';
+   (window as any).datasetteWorker = initApp();
+  </script>
+</Layout>
+
+<style>
+  textarea#sql-editor {
+    padding: 0.5em;
+    font-size: 1em;
+    line-height: 1.4;
+  }
+</style>
