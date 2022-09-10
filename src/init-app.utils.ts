@@ -19,3 +19,9 @@ export function isFragmentLink(url) {
     u.hash != location.hash
   );
 }
+
+  export const fullUrlToPath = (fullUrl) => {
+    const url = new URL(fullUrl);
+    const path = url.href.split(url.origin)[1];
+    return path;
+  };
