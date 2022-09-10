@@ -1,12 +1,41 @@
 // Entrypoint to Datasette-Lite Main
 import { isExternal, isFragmentLink } from "./init-app.utils";
-// https://www.npmjs.com/package/xss
 import escapeHtml from "xss";
 
+const onReceiveMessageFromWorker = (event: MessageEvent<any>) => {
+  let loadingLogs = ["Loading..."];
 
+  const ta = document.getElementById("loading-logs");
+  if (event.data.type == "log") {
+    loadingLogs.push(event.data.line);
+    ta.value = loadingLogs.join("\n");
+    ta.scrollTop = ta.scrollHeight;
+    return;
+  }
+  let html = "";
+  if (event.data.error) {
+    html = `<div style="padding: 0.5em"><h3>Error</h3><pre>${escapeHtml(
+      event.data.error
+    )}</pre></div>`;
+  } else if (/^text\/html/.exec(event.data.contentType)) {
+    html = event.data.text;
+  } else if (/^application\/json/.exec(event.data.contentType)) {
+    html = `<pre style="padding: 0.5em">${escapeHtml(
+      JSON.stringify(JSON.parse(event.data.text), null, 4)
+    )}</pre>`;
+  } else {
+    html = `<pre style="padding: 0.5em">${escapeHtml(event.data.text)}</pre>`;
+  }
+  document.getElementById("output").innerHTML = html;
+  let title = document.getElementById("output").querySelector("title");
+  if (title) {
+    document.title = title.innerText;
+  }
+  window.scrollTo({ top: 0, left: 0 });
+  document.getElementById("loading-indicator").style.display = "none";
+};
 
 export function initApp() {
-
   const datasetteWorker = new Worker("webworker.js");
   const urlParams = new URLSearchParams(location.search);
   const initialUrl = urlParams.get("url");
@@ -22,40 +51,9 @@ export function initApp() {
     installUrls,
   });
 
-  let loadingLogs = ["Loading..."];
+  datasetteWorker.onmessage = onReceiveMessageFromWorker;
 
-  datasetteWorker.onmessage = (event) => {
-    const ta = document.getElementById("loading-logs");
-    if (event.data.type == "log") {
-      loadingLogs.push(event.data.line);
-      ta.value = loadingLogs.join("\n");
-      ta.scrollTop = ta.scrollHeight;
-      return;
-    }
-    let html = "";
-    if (event.data.error) {
-      html = `<div style="padding: 0.5em"><h3>Error</h3><pre>${escapeHtml(
-        event.data.error
-      )}</pre></div>`;
-    } else if (/^text\/html/.exec(event.data.contentType)) {
-      html = event.data.text;
-    } else if (/^application\/json/.exec(event.data.contentType)) {
-      html = `<pre style="padding: 0.5em">${escapeHtml(
-        JSON.stringify(JSON.parse(event.data.text), null, 4)
-      )}</pre>`;
-    } else {
-      html = `<pre style="padding: 0.5em">${escapeHtml(event.data.text)}</pre>`;
-    }
-    document.getElementById("output").innerHTML = html;
-    let title = document.getElementById("output").querySelector("title");
-    if (title) {
-      document.title = title.innerText;
-    }
-    window.scrollTo({ top: 0, left: 0 });
-    document.getElementById("loading-indicator").style.display = "none";
-  };
-
-  // Window...
+  // Window: Intercept history state changes
   window.onpopstate = function (event) {
     console.log(event);
     datasetteWorker.postMessage({
@@ -71,14 +69,15 @@ export function initApp() {
   }
 
   // Attach DOM listeners, mostly for data inputs
-  attachEventListeners(datasetteWorker);
+  const output = document.getElementById("output");
+  attachEventListeners(output, datasetteWorker);
 
   // Return web worker in case other components want to talk to it, should be a singleton
   return datasetteWorker;
 }
 
-//
-function attachEventListeners(datasetteWorker: Worker) {
+// Intercept events coming from the datasette HTML page.
+function attachEventListeners(output: HTMLElement, datasetteWorker: Worker) {
   function loadPath(path) {
     path = path.split("#")[0].replace("http://localhost", "");
     console.log("Navigating to", { path });
@@ -86,7 +85,6 @@ function attachEventListeners(datasetteWorker: Worker) {
     datasetteWorker.postMessage({ path });
   }
 
-  let output = document.getElementById("output");
   output.addEventListener(
     "click",
     (ev) => {
