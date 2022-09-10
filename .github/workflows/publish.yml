@@ -1,28 +1,30 @@
+# Archived: replace with SaaS service since this doesn't publish from site root
+# this breaks since internal code uses absolute rather than relative links
+
 # https://github.com/marketplace/actions/deploy-to-github-pages
+# name: Deploy on main
+# on:
+#   push:
+#     branches:
+#       - main
 
-name: Deploy on main
-on:
-  push:
-    branches:
-      - main
+# # This replaces the need for a PAT
+# permissions:
+#   contents: write
 
-# This replaces the need for a PAT
-permissions:
-  contents: write
+# jobs:
+#   build-and-deploy:
+#     concurrency: ci-${{ github.ref }} # Recommended if you intend to make multiple deployments in quick succession.
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout 🛎️
+#         uses: actions/checkout@v3
+#       - name: Install and Build 🔧
+#         run: |
+#           yarn
+#           yarn run build
 
-jobs:
-  build-and-deploy:
-    concurrency: ci-${{ github.ref }} # Recommended if you intend to make multiple deployments in quick succession.
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout 🛎️
-        uses: actions/checkout@v3
-      - name: Install and Build 🔧
-        run: |
-          yarn
-          yarn run build
-
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: dist/ # The folder the action should deploy.
+#       - name: Deploy 🚀
+#         uses: JamesIves/github-pages-deploy-action@v4
+#         with:
+#           folder: dist/ # The folder the action should deploy.
