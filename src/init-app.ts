@@ -1,5 +1,9 @@
 // Entrypoint to Datasette-Lite Main
-import { escapeHtml, isExternal, isFragmentLink } from "./init-app.utils";
+import { isExternal, isFragmentLink } from "./init-app.utils";
+// https://www.npmjs.com/package/xss
+import escapeHtml from "xss";
+
+
 
 export function initApp() {
 

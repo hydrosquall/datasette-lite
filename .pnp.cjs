@@ -33,7 +33,8 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
         [null, {\
           "packageLocation": "./",\
           "packageDependencies": [\
-            ["astro", "npm:1.2.1"]\
+            ["astro", "npm:1.2.1"],\
+            ["xss", "npm:1.0.14"]\
           ],\
           "linkType": "SOFT"\
         }]\
@@ -1544,6 +1545,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD"\
         }]\
       ]],\
+      ["commander", [\
+        ["npm:2.20.3", {\
+          "packageLocation": "./.yarn/cache/commander-npm-2.20.3-d8dcbaa39b-ab8c07884e.zip/node_modules/commander/",\
+          "packageDependencies": [\
+            ["commander", "npm:2.20.3"]\
+          ],\
+          "linkType": "HARD"\
+        }]\
+      ]],\
       ["common-ancestor-path", [\
         ["npm:1.0.1", {\
           "packageLocation": "./.yarn/cache/common-ancestor-path-npm-1.0.1-27534e68da-1d2e418606.zip/node_modules/common-ancestor-path/",\
@@ -1593,6 +1603,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD"\
         }]\
       ]],\
+      ["cssfilter", [\
+        ["npm:0.0.10", {\
+          "packageLocation": "./.yarn/cache/cssfilter-npm-0.0.10-28e06ce546-bc2c52bbb3.zip/node_modules/cssfilter/",\
+          "packageDependencies": [\
+            ["cssfilter", "npm:0.0.10"]\
+          ],\
+          "linkType": "HARD"\
+        }]\
+      ]],\
       ["data-uri-to-buffer", [\
         ["npm:4.0.0", {\
           "packageLocation": "./.yarn/cache/data-uri-to-buffer-npm-4.0.0-e7a49f58f7-a010653869.zip/node_modules/data-uri-to-buffer/",\
@@ -1607,7 +1626,8 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageLocation": "./",\
           "packageDependencies": [\
             ["datasette-lite", "workspace:."],\
-            ["astro", "npm:1.2.1"]\
+            ["astro", "npm:1.2.1"],\
+            ["xss", "npm:1.0.14"]\
           ],\
           "linkType": "SOFT"\
         }]\
@@ -5723,6 +5743,17 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageLocation": "./.yarn/cache/wrappy-npm-1.0.2-916de4d4b3-159da4805f.zip/node_modules/wrappy/",\
           "packageDependencies": [\
             ["wrappy", "npm:1.0.2"]\
+          ],\
+          "linkType": "HARD"\
+        }]\
+      ]],\
+      ["xss", [\
+        ["npm:1.0.14", {\
+          "packageLocation": "./.yarn/cache/xss-npm-1.0.14-eb6e57872e-77c6a60a5f.zip/node_modules/xss/",\
+          "packageDependencies": [\
+            ["xss", "npm:1.0.14"],\
+            ["commander", "npm:2.20.3"],\
+            ["cssfilter", "npm:0.0.10"]\
           ],\
           "linkType": "HARD"\
         }]\
