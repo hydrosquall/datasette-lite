@@ -1,0 +1,4 @@
+{
+  "name": "datasette-lite",
+  "packageManager": "yarn@3.2.3"
+}
