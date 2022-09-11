@@ -3,89 +3,10 @@ import {
   isExternal,
   isFragmentLink,
   fullUrlToPath,
-  setInnerHTMLWithScriptsAndOnLoad,
+  getHtmlFromEvent,
 } from "./init-app.utils";
-import escapeHtml from "xss";
 
-type FromWebWorkerEvent =
-  | {
-      error: string;
-      type: "error";
-    }
-  | {
-      type: "forwardAsset";
-      path: string;
-      text: string;
-      contentType: string;
-      status: any; // TBD
-    }
-  | {
-      type: "log";
-      line: string;
-    }
-  | {
-      // TODO... narrow down when this can happen
-      type: "other";
-      contentType: "string";
-      text: string;
-    };
-
-// HACK... temporary leave this as a global?
-
-function getHtmlFromEvent(eventData: FromWebWorkerEvent) {
-  // TODO... is  ts-pattern appropriate?
-  let html = "";
-
-  if (eventData.type === "error") {
-    html = `<div style="padding: 0.5em"><h3>Error</h3><pre>${escapeHtml(
-      eventData.error
-    )}</pre></div>`;
-  } else if (/^text\/html/.exec(eventData.contentType)) {
-    html = eventData.text;
-  } else if (/^application\/json/.exec(eventData.contentType)) {
-    html = `<pre style="padding: 0.5em">${escapeHtml(
-      JSON.stringify(JSON.parse(eventData.text), null, 4)
-    )}</pre>`;
-  } else {
-    html = `<pre style="padding: 0.5em">${escapeHtml(eventData.text)}</pre>`;
-  }
-
-  return html;
-}
-
-function onWebWorkerMessage(event: MessageEvent<FromWebWorkerEvent>) {
-  const eventData = event.data;
-
-  if (eventData.type === "forwardAsset") {
-    // IF data is for service worker, relay it
-    console.log("forwarding asset", eventData.path);
-    navigator.serviceWorker.ready.then((registration) => {
-      registration.active.postMessage(
-        JSON.stringify({
-          datasetteAssetContent: eventData.text,
-          datasetteAssetUrl: eventData.path,
-          contentType: eventData.contentType,
-        })
-      );
-    });
-    return;
-  } else if (eventData.type === "log") {
-    const ta = document.getElementById("loading-logs") as HTMLTextAreaElement;
-    ta.value = ta.value + `\n${eventData.line}`;
-    ta.scrollTop = ta.scrollHeight;
-  } else {
-      const innerHtml = getHtmlFromEvent(eventData);
-      const outputElement = document.getElementById("output");
-      setInnerHTMLWithScriptsAndOnLoad(outputElement, innerHtml);
-         let title = document.getElementById("output").querySelector("title");
-        if (title) {
-          document.title = title.innerText;
-        }
-
-        window.scrollTo({ top: 0, left: 0 });
-        document.getElementById("loading-indicator").style.display = "none";
-  }
-}
+import { FromWebWorkerEvent } from "./init-app.types";
 
 // Global entrypoint
 export async function initApp() {
@@ -227,4 +148,119 @@ function attachEventListeners(output: HTMLElement, datasetteWorker: Worker) {
     },
     true
   );
+}
+
+// Helper functions. May some side effects.
+
+// forked allen kim: https://stackoverflow.com/a/47614491/5129731
+const setInnerHTMLWithScriptsAndOnLoad = async function (elm, html) {
+  elm.innerHTML = html;
+  // throw Error('failure');
+  const scripts = Array.from(elm.querySelectorAll("script"));
+  // console.log('scripts', scripts);
+
+  // A bit hacky but acceptable. Sorting might be better.
+  const scriptsWithDefer = []; // push to end
+  const scriptsWithoutDefer = [];
+  const inlineScripts = [];
+
+  scripts.forEach((script) => {
+    const src = script.getAttribute("src") || "";
+    // Force sql formatter to go to end b/c otherwise codemirror has issues
+    if (src === null || src === "") {
+      inlineScripts.push(script);
+    } else if (script.getAttribute("defer") === null) {
+      scriptsWithoutDefer.push(script);
+    } else {
+      scriptsWithDefer.push(script);
+    }
+  });
+
+  const allRemoteScripts = [...scriptsWithDefer, ...scriptsWithoutDefer];
+
+  // Try to make the scripts wait until the page had loaded before running
+  const asyncLoadPromises = [];
+
+  // insert async scripts in bulk
+  const fragment = new DocumentFragment();
+  allRemoteScripts.forEach((oldScript) => {
+    // console.log('scriptOrder', oldScript.getAttribute('src'));
+    const newScript = document.createElement("script");
+    Array.from(oldScript.attributes).forEach((attr) =>
+      newScript.setAttribute(attr.name, attr.value)
+    );
+    fragment.appendChild(newScript);
+    oldScript.remove();
+    const loadedPromise = new Promise(function (resolve, reject) {
+      newScript.onload = resolve;
+      newScript.onerror = reject;
+    });
+    asyncLoadPromises.push(loadedPromise);
+  });
+
+  // NOTE: this doesn't handle "window.onload" listeners. May need to call that manually
+  const head = document.querySelectorAll("head")[0];
+  head.appendChild(fragment);
+
+  // wait for all scripts to load before executing inline JS
+  // console.log('before')
+  await Promise.all(asyncLoadPromises);
+  // console.log('after');
+
+  // Then insert inline scripts after async items loaded
+  const inlineFragment = new DocumentFragment();
+  inlineScripts.forEach((oldScript) => {
+    const newScript = document.createElement("script");
+    Array.from(oldScript.attributes).forEach((attr) =>
+      newScript.setAttribute(attr.name, attr.value)
+    );
+    newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+    inlineFragment.appendChild(newScript);
+  });
+
+  head.appendChild(inlineFragment);
+
+  // Trigger onloads to finish scripting since this function is async
+  if (window.onload) {
+    console.log("re-dispatching onload");
+    window.onload(); // used by host page
+  }
+  console.log("dispatching scripts loaded");
+  // plugins need to know when all APIS are ready...
+  // window is no good... need to use document.
+  document.dispatchEvent(new CustomEvent("DatasetteLiteScriptsLoaded")); // used by vega
+};
+
+function onWebWorkerMessage(event: MessageEvent<FromWebWorkerEvent>) {
+  const eventData = event.data;
+
+  if (eventData.type === "forwardAsset") {
+    // IF data is for service worker, relay it
+    console.log("forwarding asset", eventData.path);
+    navigator.serviceWorker.ready.then((registration) => {
+      registration.active.postMessage(
+        JSON.stringify({
+          datasetteAssetContent: eventData.text,
+          datasetteAssetUrl: eventData.path,
+          contentType: eventData.contentType,
+        })
+      );
+    });
+    return;
+  } else if (eventData.type === "log") {
+    const ta = document.getElementById("loading-logs") as HTMLTextAreaElement;
+    ta.value = ta.value + `\n${eventData.line}`;
+    ta.scrollTop = ta.scrollHeight;
+  } else {
+    const innerHtml = getHtmlFromEvent(eventData);
+    const outputElement = document.getElementById("output");
+    setInnerHTMLWithScriptsAndOnLoad(outputElement, innerHtml);
+    let title = document.getElementById("output").querySelector("title");
+    if (title) {
+      document.title = title.innerText;
+    }
+
+    window.scrollTo({ top: 0, left: 0 });
+    document.getElementById("loading-indicator").style.display = "none";
+  }
 }
