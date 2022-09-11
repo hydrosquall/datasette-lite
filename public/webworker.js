@@ -1,8 +1,8 @@
 importScripts("https://cdn.jsdelivr.net/pyodide/v0.20.0/full/pyodide.js");
 
 function log(line) {
-  console.log({line})
-  self.postMessage({type: 'log', line: line});
+  console.log({ line });
+  self.postMessage({ type: "log", line: line });
 }
 
 async function startDatasette(settings) {
@@ -12,7 +12,7 @@ async function startDatasette(settings) {
   let needsDataDb = false;
   let shouldLoadDefaults = true;
   if (settings.initialUrl) {
-    let name = settings.initialUrl.split('.db')[0].split('/').slice(-1)[0];
+    let name = settings.initialUrl.split(".db")[0].split("/").slice(-1)[0];
     toLoad.push([name, settings.initialUrl]);
     shouldLoadDefaults = false;
   }
@@ -34,11 +34,11 @@ async function startDatasette(settings) {
     toLoad.push(["content.db", "https://datasette.io/content.db"]);
   }
   self.pyodide = await loadPyodide({
-    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.20.0/full/"
+    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.20.0/full/",
   });
-  await pyodide.loadPackage('micropip', log);
-  await pyodide.loadPackage('ssl', log);
-  await pyodide.loadPackage('setuptools', log); // For pkg_resources
+  await pyodide.loadPackage("micropip", log);
+  await pyodide.loadPackage("ssl", log);
+  await pyodide.loadPackage("setuptools", log); // For pkg_resources
   try {
     await self.pyodide.runPythonAsync(`
     # Grab that fixtures.db database
@@ -111,26 +111,26 @@ async function startDatasette(settings) {
     `);
     datasetteLiteReady();
   } catch (error) {
-    self.postMessage({error: error.message});
+    self.postMessage({ error: error.message, type: 'error' });
   }
 }
 
 // Outside promise pattern
 // https://github.com/simonw/datasette-lite/issues/25#issuecomment-1116948381
 let datasetteLiteReady;
-let readyPromise = new Promise(function(resolve) {
+let readyPromise = new Promise(function (resolve) {
   datasetteLiteReady = resolve;
 });
 
 self.onmessage = async (event) => {
-  console.log({event, data: event.data});
-  if (event.data.type == 'startup') {
+  console.log({ data: event.data });
+  if (event.data.type == "startup") {
     await startDatasette(event.data);
     return;
   }
   // make sure loading is done
   await readyPromise;
-  console.log(event, event.data);
+  // console.log(event, event.data);
   try {
     let [status, contentType, text] = await self.pyodide.runPythonAsync(
       `
@@ -142,8 +142,22 @@ self.onmessage = async (event) => {
       [response.status_code, response.headers.get("content-type"), response.text]
       `
     );
-    self.postMessage({status, contentType, text});
+
+    // change contentType if necessary
+    // In jupyterlite, fetching from relative paths works. in others, you need an absolute path
+    // relative to a root
+    // if (event.data.path.endsWith('.js') && contentType.includes("text/html")) {
+    //   contentType = contentType.replace('text/html', "application/javascript");
+    // }
+
+    self.postMessage({
+      status,
+      contentType,
+      text,
+      path: event.data.path,
+      type: event.data.type, // // ideally it's asset?
+    });
   } catch (error) {
-    self.postMessage({error: error.message});
+    self.postMessage({ error: error.message, type: "error" });
   }
 };
