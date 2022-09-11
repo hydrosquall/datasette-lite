@@ -38,7 +38,7 @@ const cacheFirst = async (event) => {
       if (!client) return;
 
       console.log("localRequest", request.url);
-      console.log("tried to postmessage");
+      // console.log("tried to postmessage");
       await client.postMessage({
         msg: "Please help fetch this",
         url: request.url,
@@ -51,10 +51,9 @@ const cacheFirst = async (event) => {
 self.addEventListener("fetch", (event) => {
   // Send a message to the client.
   const { request } = event;
-  console.debug("Request", event.request);
+  // console.debug("Request", event.request);
   const url = new URL(event.request.url);
   const pathName = url.pathname;
-
   const isLocalRequest =
     request.referrer !== request.url &&
     request.referrer &&
@@ -65,6 +64,8 @@ self.addEventListener("fetch", (event) => {
     !pathName.startsWith("/src") &&
     !pathName.startsWith("/hoisted.") && // astro framework
     !pathName.startsWith("/node_modules") &&
+    !pathName.startsWith("/.yarn") &&
+    !pathName.startsWith("/@fs/Users/") &&
     !pathName.startsWith("/@vite") &&
     !pathName.includes("/#/"); // soft exclude HTML pages
 
@@ -73,7 +74,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(event.request));
     return;
   }
-  console.log(event.request.url);
+  // console.log(event.request.url);
 
   event.respondWith(cacheFirst(event));
 });
