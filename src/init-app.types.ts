@@ -4,6 +4,7 @@ export type ForwardAssetEvent = {
   text: string;
   contentType: string;
   status: any; // TBD
+  requestId: number;
 };
 
 export type WorkerErrorEvent = {

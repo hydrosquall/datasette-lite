@@ -1,3 +1,4 @@
+import { ForwardAssetEvent } from "./init-app.types";
 // Entrypoint to Datasette-Lite Main
 import {
   isExternal,
@@ -37,10 +38,15 @@ export async function initApp() {
 
   // Capture messages from SW
   navigator.serviceWorker.addEventListener("message", (event) => {
-    console.log("serviceWorkerMessage", event.data.msg, event.data.url);
+    console.log("serviceWorkerMessage", event.data.url);
     // Let's ask webworker to get the file for me
     const path = fullUrlToPath(event.data.url);
-    datasetteWorker.postMessage({ path, type: "forwardAsset" });
+    const message = {
+      path,
+      type: "forwardAsset",
+      requestId: event.data.requestId,
+    };
+    datasetteWorker.postMessage(message);
   });
 
   // Register URL state
@@ -150,7 +156,7 @@ function attachEventListeners(output: HTMLElement, datasetteWorker: Worker) {
   );
 }
 
-// Helper functions. May some side effects.
+// Helper functions. May have some side effects.
 
 // forked allen kim: https://stackoverflow.com/a/47614491/5129731
 const setInnerHTMLWithScriptsAndOnLoad = async function (elm, html) {
@@ -232,17 +238,17 @@ const setInnerHTMLWithScriptsAndOnLoad = async function (elm, html) {
 };
 
 function onWebWorkerMessage(event: MessageEvent<FromWebWorkerEvent>) {
-  const eventData = event.data;
+  const { data: eventData } = event;
 
   if (eventData.type === "forwardAsset") {
-    // IF data is for service worker, relay it
-    console.log("forwarding asset", eventData.path);
+    // console.log("forwarding asset", eventData.path);
     navigator.serviceWorker.ready.then((registration) => {
       registration.active.postMessage(
         JSON.stringify({
           datasetteAssetContent: eventData.text,
           datasetteAssetUrl: eventData.path,
           contentType: eventData.contentType,
+          requestId: eventData.requestId,
         })
       );
     });
