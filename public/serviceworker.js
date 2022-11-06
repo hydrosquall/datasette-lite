@@ -6,6 +6,31 @@ self.addEventListener("activate", (event) => {
   console.log("Service worker activated");
 });
 
+// Helpers for pyodide assets
+const putInCache = async (request, response) => {
+  const cache = await caches.open("v1");
+  await cache.put(request, response);
+};
+
+const cacheFirst = async (request) => {
+  const responseFromCache = await caches.match(request);
+  if (responseFromCache) {
+    return responseFromCache;
+  }
+  const responseFromNetwork = await fetch(request);
+  putInCache(request, responseFromNetwork.clone());
+  return responseFromNetwork;
+};
+
+// Domains to cache instead of refetching live
+const PREFIXES_TO_CACHE = [
+  "https://cdn.jsdelivr.net",
+  "https://files.pythonhosted.org/packages/",
+  "https://pypi.org/pypi/",
+  // speed the sample database
+  "https://datasette.io/content.db",
+];
+
 // Use reject so that it doesn't take the happy path if the other promise won the race
 // https://stackoverflow.com/questions/35991815/stop-promises-execution-once-the-first-promise-resolves
 const delay = (numMilliseconds) => {
@@ -39,6 +64,11 @@ self.addEventListener("fetch", (event) => {
     !pathName.startsWith("/@vite") &&
     !pathName.includes("/#/"); // soft exclude HTML pages
 
+  if (PREFIXES_TO_CACHE.some((domain) => request.url.startsWith(domain))) {
+    event.respondWith(cacheFirst(request));
+    return;
+  }
+
   // rule out assets that need to be retrieved remotely.
   if (!isLocalRequest || request.referrer === "") {
     event.respondWith(fetch(event.request));
@@ -58,8 +88,11 @@ self.addEventListener("fetch", (event) => {
     console.log("Either I timed out, or my parent finished", pathName);
 
     // check if it came back already
-    if (RESPONSE_REGISTRY[localRequestId] && typeof RESPONSE_REGISTRY[localRequestId] !== 'function') {
-      console.log("I lost the race, it's ok")
+    if (
+      RESPONSE_REGISTRY[localRequestId] &&
+      typeof RESPONSE_REGISTRY[localRequestId] !== "function"
+    ) {
+      console.log("I lost the race, it's ok");
       return;
     }
 
@@ -91,7 +124,7 @@ self.addEventListener("fetch", (event) => {
       // console.log("localRequest", request.url);
       console.log("tried to postmessage");
       client.postMessage({
-        msg: 'Serviceworker requesting data from Webworker',
+        msg: "Serviceworker requesting data from Webworker",
         url: request.url,
         requestId: localRequestId,
       });
