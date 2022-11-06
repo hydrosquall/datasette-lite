@@ -5,6 +5,7 @@ import {
   isFragmentLink,
   fullUrlToPath,
   getHtmlFromEvent,
+  rewriteGithubUrlWithCorsHeaders
 } from "./init-app.utils";
 
 import { FromWebWorkerEvent } from "./init-app.types";
@@ -52,9 +53,9 @@ export async function initApp() {
   // Register URL state
   const datasetteWorker = new Worker("webworker.js");
   const urlParams = new URLSearchParams(location.search);
-  const initialUrl = urlParams.get("url");
-  const csvUrls = urlParams.getAll("csv");
-  const sqlUrls = urlParams.getAll("sql");
+  const initialUrl = rewriteGithubUrlWithCorsHeaders(urlParams.get('url'));
+  const csvUrls = urlParams.getAll('csv').map(rewriteGithubUrlWithCorsHeaders);
+  const sqlUrls = urlParams.getAll('sql').map(rewriteGithubUrlWithCorsHeaders);
   const installUrls = urlParams.getAll("install");
 
   datasetteWorker.postMessage({

@@ -45,3 +45,18 @@ export function getHtmlFromEvent(eventData: WorkerErrorEvent | OtherEvent) {
 
   return `<pre style="padding: 0.5em">${escapeHtml(eventData.text)}</pre>`;
 }
+
+const githubUrlRegex = /^https:\/\/github.com\/(.*)\/(.*)\/blob\/(.*)(\?raw=true)?$/;
+
+/**
+ * https://github.com/simonw/datasette-lite/issues/46
+ * If URL is from github, rewrite to raw.githubusercontent.com
+ * This ensures files are served with correct CORS headers.
+ */
+export function rewriteGithubUrlWithCorsHeaders(url) {
+  const matches = githubUrlRegex.exec(url);
+  if (matches) {
+    return `https://raw.githubusercontent.com/${matches[1]}/${matches[2]}/${matches[3]}`;
+  }
+  return url;
+}
