@@ -111,7 +111,7 @@ async function startDatasette(settings) {
     `);
     datasetteLiteReady();
   } catch (error) {
-    self.postMessage({ error: error.message, type: 'error' });
+    self.postMessage({ error: error.message, type: "error" });
   }
 }
 
@@ -130,7 +130,7 @@ self.onmessage = async (event) => {
   }
   // make sure loading is done
   await readyPromise;
-  // console.log(event, event.data);
+  console.log(event, event.data, event.msg);
   try {
     let [status, contentType, text] = await self.pyodide.runPythonAsync(
       `
@@ -149,15 +149,15 @@ self.onmessage = async (event) => {
     // if (event.data.path.endsWith('.js') && contentType.includes("text/html")) {
     //   contentType = contentType.replace('text/html', "application/javascript");
     // }
-
     self.postMessage({
       status,
       contentType,
       text,
       path: event.data.path,
-      type: event.data.type, // // ideally it's asset?
+      type: event.data.type,
+      requestId: event.data.requestId,
     });
   } catch (error) {
-    self.postMessage({ error: error.message, type: "error" });
+    self.postMessage({ error: error.message, type: 'error' });
   }
 };

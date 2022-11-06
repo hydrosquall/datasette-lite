@@ -6,54 +6,24 @@ self.addEventListener("activate", (event) => {
   console.log("Service worker activated");
 });
 
-const cacheFirst = async (event) => {
-  const { request } = event;
-
-  // it's a hack but we can make a cache on this thread
-  // or do we need to use the global cache to be mutable?
-  const fullUrlToPath = (fullUrl) => {
-    const x = new URL(fullUrl);
-    const path = x.href.split(x.origin)[1];
-    return path;
-  };
-  const path = fullUrlToPath(request.url);
-  console.log("lookupPath", path);
-  const maybeCached = await caches.match(path);
-
-  if (maybeCached) {
-    console.log(maybeCached);
-    return maybeCached;
-  }
-
-  event.waitUntil(
-    (async () => {
-      // Exit early if we don't have access to the client.
-      // Eg, if it's cross-origin.
-      if (!event.clientId) return;
-
-      // Get the client.
-      const client = await self.clients.get(event.clientId);
-      // Exit early if we don't get the client.
-      // Eg, if it closed.
-      if (!client) return;
-
-      console.log("localRequest", request.url);
-      // console.log("tried to postmessage");
-      await client.postMessage({
-        msg: "Please help fetch this",
-        url: request.url,
-      });
-      return fetch(request.url);
-    })()
-  );
+// Use reject so that it doesn't take the happy path if the other promise won the race
+// https://stackoverflow.com/questions/35991815/stop-promises-execution-once-the-first-promise-resolves
+const delay = (numMilliseconds) => {
+  return new Promise((resolve, reject) => setTimeout(reject, numMilliseconds));
 };
+
+let ACTIVE_RESPONSE_ID = 0;
+const RESPONSE_REGISTRY = {}; // TODO: convert to Map()
+const TIMEOUT_DURATION = 10000; // milliseconds: how long before it gives up.
 
 self.addEventListener("fetch", (event) => {
   // Send a message to the client.
   const { request } = event;
   // console.debug("Request", event.request);
   const url = new URL(event.request.url);
-  const pathName = url.pathname;
+
+  const { pathname: pathName } = url;
+
   const isLocalRequest =
     request.referrer !== request.url &&
     request.referrer &&
@@ -69,31 +39,87 @@ self.addEventListener("fetch", (event) => {
     !pathName.startsWith("/@vite") &&
     !pathName.includes("/#/"); // soft exclude HTML pages
 
-  // rule out assets too
+  // rule out assets that need to be retrieved remotely.
   if (!isLocalRequest || request.referrer === "") {
     event.respondWith(fetch(event.request));
     return;
   }
-  // console.log(event.request.url);
 
-  event.respondWith(cacheFirst(event));
+  // Otherwise, start waiting for the request or a timeout
+  // ----------------------------------------------------
+  // console.log("trying to fetch", pathName);
+  let localRequestId = ACTIVE_RESPONSE_ID;
+  const successResponse = new Promise((resolve) => {
+    console.log({ localRequestId }); // storing response
+    RESPONSE_REGISTRY[localRequestId] = resolve;
+  });
+
+  const failResponse = delay(TIMEOUT_DURATION).then(() => {
+    console.log("Either I timed out, or my parent finished", pathName);
+
+    // check if it came back already
+    if (RESPONSE_REGISTRY[localRequestId] && typeof RESPONSE_REGISTRY[localRequestId] !== 'function') {
+      console.log("I lost the race, it's ok")
+      return;
+    }
+
+    return new Response(`Timed out after ${TIMEOUT_DURATION}ms`, {
+      headers: {
+        "Content-Type": "text/html",
+      },
+    });
+  });
+
+  // Set up for next response
+  ACTIVE_RESPONSE_ID = ACTIVE_RESPONSE_ID + 1;
+  const jointPromise = Promise.race([failResponse, successResponse]);
+
+  // Prepare to respond
+  event.respondWith(jointPromise);
+
+  // Make sure not to quit until we can submit our request
+  event.waitUntil(
+    (async () => {
+      // Exit early if we don't have access to the client.
+      // Eg, if it's cross-origin.
+      if (!event.clientId) return;
+
+      // Get the client.
+      const client = await self.clients.get(event.clientId);
+      if (!client) return;
+
+      // console.log("localRequest", request.url);
+      console.log("tried to postmessage");
+      client.postMessage({
+        msg: 'Serviceworker requesting data from Webworker',
+        url: request.url,
+        requestId: localRequestId,
+      });
+    })()
+  );
 });
 
-// Cache responses from the web-worker for the next time data is requested
-self.onmessage = async (event) => {
-  const payload = JSON.parse(event.data);
-  // console.log(`The client sent message`, payload);
+// Fullfill the intercepted fetch request
+self.onmessage = (event) => {
+  let payload = {};
+  try {
+    payload = JSON.parse(event.data);
+  } catch (error) {
+    console.warn("Event data was not JSON serializable", error);
+  }
+
   if (payload?.datasetteAssetUrl) {
-    // console.log("storedPath", payload.datasetteAssetUrl);
-    const cache = await caches.open("v1");
-    // TODO: do we need to store more header types?
-    await cache.put(
-      payload.datasetteAssetUrl,
-      new Response(payload.datasetteAssetContent, {
-        headers: {
-          "Content-Type": payload.contentType,
-        },
-      })
-    );
+    const { requestId: payloadId } = payload;
+    const resolver = RESPONSE_REGISTRY[payloadId];
+    const response = new Response(payload.datasetteAssetContent, {
+      headers: {
+        "Content-Type": payload.contentType,
+      },
+    });
+
+    resolver(response);
+
+    // free  memory in registry
+    delete RESPONSE_REGISTRY[payloadId];
   }
 };

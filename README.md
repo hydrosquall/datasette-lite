@@ -16,3 +16,12 @@ Datasette, a python-based data exploration tool running in the browser using Web
 
 - Add a build system to enable developing code into smaller pieces
 - Make site analytics code optional
+
+## Development
+
+Install + run local dev server
+
+```bash
+yarn install
+yarn dev
+```
