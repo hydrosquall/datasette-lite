@@ -1,0 +1,31 @@
+---
+import Layout from "../layouts/Layout.astro";
+import LoadingIndicator from "../components/LoadingIndicator.astro";
+import LoadCustomForm from "../components/LoadCustomForm.astro";
+---
+
+<Layout title="Datasette">
+  <!-- DOM -->
+  <LoadingIndicator />
+  <div id="output"></div>
+  <LoadCustomForm />
+
+  <!-- Scripts -->
+  <script>
+    import { initApp } from "../init-app";
+    (window as any).datasetteWorker = initApp();
+  </script>
+  <script>
+    //  a non module script "env variable" for plugins to check for
+    // In future: a "plugin manager" class that can be registered / initialize everything in order / makes sure plugins are loaded in right order if needed
+    (window as any).__IS_DATASETTE_LITE__ = true;
+  </script>
+</Layout>
+
+<style>
+  textarea#sql-editor {
+    padding: 0.5em;
+    font-size: 1em;
+    line-height: 1.4;
+  }
+</style>

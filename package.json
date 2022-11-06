@@ -1,0 +1,18 @@
+{
+  "name": "datasette-lite",
+  "packageManager": "yarn@3.2.3",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^1.2.1",
+    "xss": "^1.0.14"
+  },
+  "volta": {
+    "node": "16.10.0",
+    "yarn": "1.22.18"
+  }
+}

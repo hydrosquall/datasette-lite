@@ -2,7 +2,7 @@ name: Test
 
 on:
   push:
-  pull_request:
+  # pull_request:
 
 permissions:
   contents: read
@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+
+    # Python setup
     - name: Set up Python 3.10
       uses: actions/setup-python@v3
       with:
@@ -27,6 +29,17 @@ jobs:
       run: |
         pip install -r dev-requirements.txt
         playwright install
+
+    # Javascript dependencies
+    - name: Setup Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: '16.x'
+    - name: Install npm dependencies
+      run:  yarn
+    - name: Compile frontend code
+      run:  yarn run build
+
     - name: Run test
       run: |
         pytest
