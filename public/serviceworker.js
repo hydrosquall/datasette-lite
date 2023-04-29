@@ -80,7 +80,7 @@ self.addEventListener("fetch", (event) => {
   // console.log("trying to fetch", pathName);
   let localRequestId = ACTIVE_RESPONSE_ID;
   const successResponse = new Promise((resolve) => {
-    console.log({ localRequestId }); // storing response
+    // console.log({ localRequestId }); // storing response
     RESPONSE_REGISTRY[localRequestId] = resolve;
   });
 
