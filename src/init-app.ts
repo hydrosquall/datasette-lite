@@ -72,7 +72,7 @@ export async function initApp() {
     installUrls,
     metadataUrl,
     jsonUrls,
-    baseUrl: window.location.origin + '/',
+    baseUrl: BASE_URL + '/',
   });
 
   datasetteWorker.onmessage = onWebWorkerMessage;
@@ -109,12 +109,13 @@ export async function initApp() {
   return datasetteWorker;
 }
 
+const BASE_URL = window.location.origin;
 // Intercept events coming from the datasette HTML page.
 function attachEventListeners(output: HTMLElement, datasetteWorker: Worker) {
   function loadPath(path) {
-    path = path.split("#")[0].replace("http://localhost", "");
+    path = path.split("#")[0].replace(BASE_URL, "");
     console.log("Navigating to", { path });
-    history.pushState({ path: path }, path, "#" + path);
+    history.pushState({ path: path }, '', "#" + path);
     datasetteWorker.postMessage({ path });
   }
 
@@ -135,8 +136,9 @@ function attachEventListeners(output: HTMLElement, datasetteWorker: Worker) {
           }
           return;
         }
-        let href = link.getAttribute("href");
-        if (isExternal(href)) {
+        const href = link.getAttribute("href");
+        // don't open new tab if base URL is the same
+        if (isExternal(href) && !href.startsWith(BASE_URL)) {
           window.open(href);
           return;
         }

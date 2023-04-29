@@ -8,7 +8,7 @@ export function isExternal(url) {
     return false;
   }
   // Is it localhost?
-  return new URL(url).host != "localhost";
+  return new URL(url).host !== "localhost";
 }
 
 export function isFragmentLink(url) {
