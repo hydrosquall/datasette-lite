@@ -8,7 +8,7 @@ export function isExternal(url) {
     return false;
   }
   // Is it localhost?
-  return new URL(url).host != "localhost";
+  return new URL(url).host !== "localhost";
 }
 
 export function isFragmentLink(url) {
@@ -47,6 +47,7 @@ export function getHtmlFromEvent(eventData: WorkerErrorEvent | OtherEvent) {
 }
 
 const githubUrlRegex = /^https:\/\/github.com\/(.*)\/(.*)\/blob\/(.*)(\?raw=true)?$/;
+const gistUrlRegex = /^https:\/\/gist.github.com\/(.*)\/(.*)$/;
 
 /**
  * https://github.com/simonw/datasette-lite/issues/46
@@ -54,9 +55,13 @@ const githubUrlRegex = /^https:\/\/github.com\/(.*)\/(.*)\/blob\/(.*)(\?raw=true
  * This ensures files are served with correct CORS headers.
  */
 export function rewriteGithubUrlWithCorsHeaders(url) {
-  const matches = githubUrlRegex.exec(url);
-  if (matches) {
-    return `https://raw.githubusercontent.com/${matches[1]}/${matches[2]}/${matches[3]}`;
+  const githubMatch = githubUrlRegex.exec(url);
+  if (githubMatch) {
+    return `https://raw.githubusercontent.com/${githubMatch[1]}/${githubMatch[2]}/${githubMatch[3]}`;
+  }
+  const gistMatch = gistUrlRegex.exec(url);
+  if (gistMatch) {
+    return `https://gist.githubusercontent.com/${gistMatch[1]}/${gistMatch[2]}/raw`;
   }
   return url;
 }

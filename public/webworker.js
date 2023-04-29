@@ -9,6 +9,7 @@ async function startDatasette(settings) {
   let toLoad = [];
   let csvs = [];
   let sqls = [];
+  let jsons = [];
   let needsDataDb = false;
   let shouldLoadDefaults = true;
   if (settings.initialUrl) {
@@ -23,6 +24,11 @@ async function startDatasette(settings) {
   }
   if (settings.sqlUrls && settings.sqlUrls.length) {
     sqls = settings.sqlUrls;
+    needsDataDb = true;
+    shouldLoadDefaults = false;
+  }
+  if (settings.jsonUrls && settings.jsonUrls.length) {
+    jsons = settings.jsonUrls;
     needsDataDb = true;
     shouldLoadDefaults = false;
   }
@@ -57,6 +63,7 @@ async function startDatasette(settings) {
     import micropip
     # Workaround for Requested 'h11<0.13,>=0.11', but h11==0.13.0 is already installed
     await micropip.install("h11==0.12.0")
+    await micropip.install("httpx==0.23")
     await micropip.install("datasette")
     # Install any extra ?install= dependencies
     install_urls = ${JSON.stringify(settings.installUrls)}
@@ -71,11 +78,23 @@ async function startDatasette(settings) {
             response = await pyfetch(sql_url)
             sql = await response.string()
             sqlite3.connect("data.db").executescript(sql)
-    # Import data from ?csv=URL CSV files
+    metadata = {
+        "about": "Datasette Lite",
+        "about_url": "https://github.com/simonw/datasette-lite"
+    }
+    metadata_url = ${JSON.stringify(settings.metadataUrl || "")}
+    if metadata_url:
+        response = await pyfetch(metadata_url)
+        content = await response.string()
+        from datasette.utils import parse_metadata
+        metadata = parse_metadata(content)
+
+    # Import data from ?csv=URL CSV files/?json=URL JSON files
     csvs = ${JSON.stringify(csvs)}
-    if csvs:
+    jsons = ${JSON.stringify(jsons)}
+    if csvs or jsons:
         await micropip.install("sqlite-utils==3.28")
-        import sqlite_utils
+        import sqlite_utils, json
         from sqlite_utils.utils import rows_from_file, TypeTracker, Format
         db = sqlite_utils.Database("data.db")
         table_names = set()
@@ -101,13 +120,39 @@ async function startDatasette(settings) {
             db[bit].transform(
                 types=tracker.types
             )
+        for json_url in jsons:
+            bit = json_url.split("/")[-1].split(".")[0].split("?")[0]
+            bit = bit.strip()
+            if not bit:
+                bit = "table"
+            prefix = 0
+            base_bit = bit
+            while bit in table_names:
+                prefix += 1
+                bit = "{}_{}".format(base_bit, prefix)
+            table_names.add(bit)
+            response = await pyfetch(json_url)
+            with open("json.json", "wb") as fp:
+                json_bytes = await response.bytes()
+                try:
+                    json_data = json.loads(json_bytes)
+                except json.decoder.JSONDecodeError:
+                    # Maybe it's newline-delimited JSON?
+                    # This will raise an unhandled exception if not
+                    json_data = [json.loads(line) for line in json_bytes.splitlines()]
+            # If it's an object, try to find first key that's a list of objects
+            if isinstance(json_data, dict):
+                for key, value in json_data.items():
+                    if isinstance(value, list) and value and isinstance(value[0], dict):
+                        json_data = value
+            assert isinstance(json_data, list), "JSON data must be a list of objects"
+            db[bit].insert_all(json_data)
+
     from datasette.app import Datasette
     ds = Datasette(names, settings={
         "num_sql_threads": 0,
-    }, metadata = {
-        "about": "Datasette Lite",
-        "about_url": "https://github.com/simonw/datasette-lite"
-    })
+        "base_url": "${settings.baseUrl}"
+    }, metadata=metadata)
     await ds.invoke_startup()
     `);
     datasetteLiteReady();

@@ -54,8 +54,14 @@ export async function initApp() {
   const datasetteWorker = new Worker("webworker.js");
   const urlParams = new URLSearchParams(location.search);
   const initialUrl = rewriteGithubUrlWithCorsHeaders(urlParams.get('url'));
+  const metadataUrl = rewriteGithubUrlWithCorsHeaders(
+    urlParams.get("metadata")
+  );
   const csvUrls = urlParams.getAll('csv').map(rewriteGithubUrlWithCorsHeaders);
   const sqlUrls = urlParams.getAll('sql').map(rewriteGithubUrlWithCorsHeaders);
+  const jsonUrls = urlParams
+    .getAll("json")
+    .map(rewriteGithubUrlWithCorsHeaders);
   const installUrls = urlParams.getAll("install");
 
   datasetteWorker.postMessage({
@@ -64,6 +70,9 @@ export async function initApp() {
     csvUrls,
     sqlUrls,
     installUrls,
+    metadataUrl,
+    jsonUrls,
+    baseUrl: BASE_URL + '/',
   });
 
   datasetteWorker.onmessage = onWebWorkerMessage;
@@ -100,12 +109,13 @@ export async function initApp() {
   return datasetteWorker;
 }
 
+const BASE_URL = window.location.origin;
 // Intercept events coming from the datasette HTML page.
 function attachEventListeners(output: HTMLElement, datasetteWorker: Worker) {
   function loadPath(path) {
-    path = path.split("#")[0].replace("http://localhost", "");
+    path = path.split("#")[0].replace(BASE_URL, "");
     console.log("Navigating to", { path });
-    history.pushState({ path: path }, path, "#" + path);
+    history.pushState({ path: path }, '', "#" + path);
     datasetteWorker.postMessage({ path });
   }
 
@@ -126,8 +136,9 @@ function attachEventListeners(output: HTMLElement, datasetteWorker: Worker) {
           }
           return;
         }
-        let href = link.getAttribute("href");
-        if (isExternal(href)) {
+        const href = link.getAttribute("href");
+        // don't open new tab if base URL is the same
+        if (isExternal(href) && !href.startsWith(BASE_URL)) {
           window.open(href);
           return;
         }
@@ -185,36 +196,33 @@ const setInnerHTMLWithScriptsAndOnLoad = async function (elm, html) {
 
   const allRemoteScripts = [...scriptsWithDefer, ...scriptsWithoutDefer];
 
-  // Try to make the scripts wait until the page had loaded before running
-  const asyncLoadPromises = [];
-
-  // insert async scripts in bulk
-  const fragment = new DocumentFragment();
-  allRemoteScripts.forEach((oldScript) => {
+  // Try to make the scripts load in sequential order
+  const blockLoadingScripts = [];
+  for (const oldScript of allRemoteScripts) {
     // console.log('scriptOrder', oldScript.getAttribute('src'));
     const newScript = document.createElement("script");
     Array.from(oldScript.attributes).forEach((attr) =>
       newScript.setAttribute(attr.name, attr.value)
     );
-    fragment.appendChild(newScript);
     oldScript.remove();
-    const loadedPromise = new Promise(function (resolve, reject) {
-      newScript.onload = resolve;
-      newScript.onerror = reject;
-    });
-    asyncLoadPromises.push(loadedPromise);
-  });
+    blockLoadingScripts.push(newScript);
+  }
 
-  // NOTE: this doesn't handle "window.onload" listeners. May need to call that manually
   const head = document.querySelectorAll("head")[0];
-  head.appendChild(fragment);
 
-  // wait for all scripts to load before executing inline JS
-  // console.log('before')
-  await Promise.all(asyncLoadPromises);
-  // console.log('after');
+  // console.log("loading some remote scripts", blockLoadingScripts.length);
+  for (const script of blockLoadingScripts) {
+    const scriptLoadPromise = new Promise((resolve, reject) => {
+      script.onload = resolve;
+      script.onerror = reject;
+    });
 
-  // Then insert inline scripts after async items loaded
+    // Need to use for-of to make sure it doesn't jump ahead
+    head.appendChild(script);
+    await scriptLoadPromise;
+  }
+
+  // Lastly, insert inline scripts after blocking items loaded
   const inlineFragment = new DocumentFragment();
   inlineScripts.forEach((oldScript) => {
     const newScript = document.createElement("script");
