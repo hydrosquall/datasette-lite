@@ -54,8 +54,14 @@ export async function initApp() {
   const datasetteWorker = new Worker("webworker.js");
   const urlParams = new URLSearchParams(location.search);
   const initialUrl = rewriteGithubUrlWithCorsHeaders(urlParams.get('url'));
+  const metadataUrl = rewriteGithubUrlWithCorsHeaders(
+    urlParams.get("metadata")
+  );
   const csvUrls = urlParams.getAll('csv').map(rewriteGithubUrlWithCorsHeaders);
   const sqlUrls = urlParams.getAll('sql').map(rewriteGithubUrlWithCorsHeaders);
+  const jsonUrls = urlParams
+    .getAll("json")
+    .map(rewriteGithubUrlWithCorsHeaders);
   const installUrls = urlParams.getAll("install");
 
   datasetteWorker.postMessage({
@@ -64,6 +70,8 @@ export async function initApp() {
     csvUrls,
     sqlUrls,
     installUrls,
+    metadataUrl,
+    jsonUrls,
   });
 
   datasetteWorker.onmessage = onWebWorkerMessage;
