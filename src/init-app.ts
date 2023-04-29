@@ -72,6 +72,7 @@ export async function initApp() {
     installUrls,
     metadataUrl,
     jsonUrls,
+    baseUrl: window.location.origin + '/',
   });
 
   datasetteWorker.onmessage = onWebWorkerMessage;
